@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Underwriting Rule Visualizer</title>
+    <style>
+        /* --- Basic Styling --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 25px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        h1, h2 {
+            color: #1a253c;
+            text-align: center;
+        }
+
+        p.subtitle {
+            text-align: center;
+            color: #5a677d;
+            margin-top: 0;
+            margin-bottom: 30px;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #e0e0e0;
+            margin: 40px 0;
+        }
+
+        /* --- Filters Section --- */
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #3a4b6c;
+        }
+
+        .filter-group select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .filter-group select:hover,
+        .filter-group select:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+        
+        #show-results-btn {
+            grid-column: 1 / -1;
+            padding: 12px 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 10px;
+        }
+
+        #show-results-btn:hover {
+            background-color: #0056b3;
+        }
+
+        /* --- Content Layout --- */
+        .content-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr; /* Give map a bit more space */
+            gap: 40px;
+            margin-top: 30px;
+        }
+        
+        @media (max-width: 900px) {
+            .content-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* --- Results List Section --- */
+        .result-item {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-left: 5px solid #007bff;
+            border-radius: 5px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .result-item h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #1a253c;
+        }
+        
+        .result-item p {
+            margin: 0;
+            color: #495057;
+            font-size: 16px;
+        }
+        
+        .result-item .states {
+            font-weight: 600;
+            color: #1e63b3;
+        }
+        
+        .no-results {
+            text-align: center;
+            color: #777;
+            font-size: 18px;
+            padding: 40px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        /* --- Map Section --- */
+        #map-container {
+            position: sticky;
+            top: 20px;
+        }
+        
+        #usa-map {
+            width: 100%;
+            height: auto;
+            stroke: #ffffff; /* White borders for states */
+            stroke-width: 1;
+            stroke-linejoin: round;
+        }
+
+        #usa-map path {
+            transition: fill 0.3s ease-in-out, transform 0.1s ease-in-out;
+            cursor: pointer;
+        }
+
+        #usa-map path:hover {
+            transform: scale(1.02);
+            stroke-width: 2;
+        }
+        
+        .map-legend {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 15px;
+            padding: 10px;
+            font-size: 14px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.2);
+        }
+        .legend-color.green { background-color: #28a745; }
+        .legend-color.red { background-color: #dc3545; }
+        .legend-color.gray { background-color: #cccccc; }
+
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Underwriting Rule Visualizer</h1>
+        <p class="subtitle">Select criteria to visualize rule enablement across states.</p>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label for="product-select">Product</label>
+                <select id="product-select">
+                    <option value="ALL">ALL</option>
+                    <option value="HO3">HO3</option>
+                    <option value="HO5">HO5</option>
+                    <option value="DP3">DP3</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="state-select">State</label>
+                <select id="state-select">
+                    <option value="ALL">ALL</option>
+                    <option value="AZ">Arizona (AZ)</option>
+                    <option value="CA">California (CA)</option>
+                    <option value="NV">Nevada (NV)</option>
+                    <option value="OR">Oregon (OR)</option>
+                    <option value="WA">Washington (WA)</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="carrier-select">Carrier</label>
+                <select id="carrier-select">
+                    <option value="ALL">ALL</option>
+                    <option value="Topa">Topa</option>
+                    <option value="Spinnaker">Spinnaker</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="policy-type-select">Policy Type</label>
+                <select id="policy-type-select">
+                    <option value="ALL">ALL</option>
+                    <option value="New Business">New Business</option>
+                    <option value="Renewal">Renewal</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="rule-name-select">Rule Name</label>
+                <select id="rule-name-select">
+                    <option value="ALL">ALL</option>
+                    <option value="LargeHouse">LargeHouse</option>
+                    <option value="SmallHouse">SmallHouse</option>
+                    <option value="InvalidEffectiveDate">InvalidEffectiveDate</option>
+                    <option value="SwimmingPoolAdded">SwimmingPoolAdded</option>
+                </select>
+            </div>
+            <button id="show-results-btn">Visualize Rules</button>
+        </div>
+
+        <hr>
+
+        <div class="content-layout">
+            <div id="results-list">
+                <h2>Enabled Rules List</h2>
+                <div id="results-container">
+                    <!-- Results will be dynamically inserted here -->
+                </div>
+            </div>
+
+            <div id="map-container">
+                <h2>Rule Activity Map</h2>
+                <div class="map-legend">
+                    <div class="legend-item">
+                        <div class="legend-color green"></div>
+                        <span>Rule(s) Active</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color red"></div>
+                        <span>Inactive (In Scope)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color gray"></div>
+                        <span>Out of Scope</span>
+                    </div>
+                </div>
+                <!-- USA Map SVG will be loaded dynamically from usa-states.svg -->
+                <div id="usa-map-wrapper"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA SOURCE ---
+        const ruleConfigurations = [
+            // --- LargeHouse Rule ---
+            { product: 'HO3', state: 'CA', carrier: 'Topa', policyType: 'New Business', ruleName: 'LargeHouse' },
+            { product: 'HO5', state: 'CA', carrier: 'Topa', policyType: 'New Business', ruleName: 'LargeHouse' },
+            { product: 'HO3', state: 'AZ', carrier: 'Spinnaker', policyType: 'New Business', ruleName: 'LargeHouse' },
+            { product: 'HO3', state: 'NV', carrier: 'Topa', policyType: 'Renewal', ruleName: 'LargeHouse' },
+
+            // --- SmallHouse Rule ---
+            { product: 'DP3', state: 'CA', carrier: 'Spinnaker', policyType: 'New Business', ruleName: 'SmallHouse' },
+            { product: 'DP3', state: 'WA', carrier: 'Spinnaker', policyType: 'New Business', ruleName: 'SmallHouse' },
+            { product: 'DP3', state: 'OR', carrier: 'Topa', policyType: 'New Business', ruleName: 'SmallHouse' },
+
+            // --- InvalidEffectiveDate Rule (applies almost everywhere for this example) ---
+            { product: 'HO3', state: 'CA', carrier: 'Topa', policyType: 'New Business', ruleName: 'InvalidEffectiveDate' },
+            { product: 'HO3', state: 'CA', carrier: 'Topa', policyType: 'Renewal', ruleName: 'InvalidEffectiveDate' },
+            { product: 'HO5', state: 'CA', carrier: 'Topa', policyType: 'New Business', ruleName: 'InvalidEffectiveDate' },
+            { product: 'DP3', state: 'CA', carrier: 'Spinnaker', policyType: 'New Business', ruleName: 'InvalidEffectiveDate' },
+            { product: 'HO3', state: 'AZ', carrier: 'Spinnaker', policyType: 'New Business', ruleName: 'InvalidEffectiveDate' },
+            { product: 'HO3', state: 'NV', carrier: 'Topa', policyType: 'Renewal', ruleName: 'InvalidEffectiveDate' },
+            { product: 'DP3', state: 'WA', carrier: 'Spinnaker', policyType: 'New Business', ruleName: 'InvalidEffectiveDate' },
+            { product: 'DP3', state: 'OR', carrier: 'Topa', policyType: 'New Business', ruleName: 'InvalidEffectiveDate' },
+            
+            // --- SwimmingPoolAdded Rule (only for renewals) ---
+            { product: 'HO3', state: 'CA', carrier: 'Topa', policyType: 'Renewal', ruleName: 'SwimmingPoolAdded' },
+            { product: 'HO5', state: 'CA', carrier: 'Topa', policyType: 'Renewal', ruleName: 'SwimmingPoolAdded' },
+            { product: 'HO3', state: 'AZ', carrier: 'Spinnaker', policyType: 'Renewal', ruleName: 'SwimmingPoolAdded' },
+            { product: 'HO3', state: 'NV', carrier: 'Topa', policyType: 'Renewal', ruleName: 'SwimmingPoolAdded' }
+        ];
+
+        // --- DOM ELEMENTS ---
+        const productSelect = document.getElementById('product-select');
+        const stateSelect = document.getElementById('state-select');
+        const carrierSelect = document.getElementById('carrier-select');
+        const policyTypeSelect = document.getElementById('policy-type-select');
+        const ruleNameSelect = document.getElementById('rule-name-select');
+        const showResultsBtn = document.getElementById('show-results-btn');
+        const resultsContainer = document.getElementById('results-container');
+        
+        // This defines which states your business operates in.
+        // It's used to color the map correctly (Red for inactive vs Gray for out-of-scope).
+        const statesInScope = [
+            'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+            'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+            'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+            'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+            'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+        ];
+
+        // --- EVENT LISTENER ---
+        showResultsBtn.addEventListener('click', visualizeResults);
+        
+        // --- CORE LOGIC ---
+        function visualizeResults() {
+            const selectedProduct = productSelect.value;
+            const selectedState = stateSelect.value;
+            const selectedCarrier = carrierSelect.value;
+            const selectedPolicyType = policyTypeSelect.value;
+            const selectedRuleName = ruleNameSelect.value;
+
+            const filteredConfigs = ruleConfigurations.filter(config => {
+                const productMatch = selectedProduct === 'ALL' || config.product === selectedProduct;
+                const stateMatch = selectedState === 'ALL' || config.state === selectedState;
+                const carrierMatch = selectedCarrier === 'ALL' || config.carrier === selectedCarrier;
+                const policyTypeMatch = selectedPolicyType === 'ALL' || config.policyType === selectedPolicyType;
+                const ruleNameMatch = selectedRuleName === 'ALL' || config.ruleName === selectedRuleName;
+                
+                return productMatch && stateMatch && carrierMatch && policyTypeMatch && ruleNameMatch;
+            });
+
+            // Process data for the list view (grouped by rule)
+            const resultsByRule = {};
+            filteredConfigs.forEach(config => {
+                if (!resultsByRule[config.ruleName]) {
+                    resultsByRule[config.ruleName] = new Set();
+                }
+                resultsByRule[config.ruleName].add(config.state);
+            });
+
+            // Process data for the map view (a flat set of active states)
+            const activeStates = new Set();
+            filteredConfigs.forEach(config => {
+                activeStates.add(config.state);
+            });
+            
+            // Render both the list and the map
+            renderResultsList(resultsByRule);
+            updateMapColors(activeStates);
+        }
+
+        function renderResultsList(resultsByRule) {
+            resultsContainer.innerHTML = '';
+            const ruleNames = Object.keys(resultsByRule).sort();
+
+            if (ruleNames.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">No active rules found for the selected criteria.</div>';
+                return;
+            }
+            
+            ruleNames.forEach(ruleName => {
+                const statesArray = Array.from(resultsByRule[ruleName]).sort();
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item';
+                
+                resultItem.innerHTML = `
+                    <h3>Rule: ${ruleName}</h3>
+                    <p>Enabled in States: <span class="states">${statesArray.join(', ')}</span></p>
+                `;
+                resultsContainer.appendChild(resultItem);
+            });
+        }
+        
+        function updateMapColors(activeStates) {
+            const activeColor = '#28a745';   // Green
+            const inactiveColor = '#dc3545'; // Red
+            const outOfScopeColor = '#cccccc'; // Gray
+            const selectedColor = '#ffd600'; // Gold highlight for selected state
+
+            // Select all path elements within the SVG
+            const allStatePaths = document.querySelectorAll('#usa-map path');
+            console.log('[updateMapColors] allStatePaths:', allStatePaths.length);
+
+            // Get the selected state from the dropdown
+            const selectedState = stateSelect.value;
+            let selectedPath = null;
+            console.log('[updateMapColors] selectedState:', selectedState);
+            console.log('[updateMapColors] activeStates:', Array.from(activeStates));
+
+            allStatePaths.forEach(path => {
+                const stateId = path.id;
+                // Remove previous selection highlight
+                path.classList.remove('selected-state');
+                console.log(`[updateMapColors] Processing stateId: ${stateId}`);
+
+                if (statesInScope.includes(stateId)) {
+                    if (activeStates.has(stateId)) {
+                        path.style.fill = activeColor;
+                        console.log(`[updateMapColors] ${stateId} set to activeColor`);
+                    } else {
+                        path.style.fill = inactiveColor;
+                        console.log(`[updateMapColors] ${stateId} set to inactiveColor`);
+                    }
+                } else {
+                    path.style.fill = outOfScopeColor;
+                    console.log(`[updateMapColors] ${stateId} set to outOfScopeColor`);
+                }
+
+                // Save reference to selected path
+                if (selectedState !== 'ALL' && stateId === selectedState) {
+                    selectedPath = path;
+                    console.log(`[updateMapColors] selectedPath found: ${stateId}`);
+                }
+            });
+
+            // Highlight the selected state if a specific state is chosen
+            if (selectedPath) {
+                console.log(`[updateMapColors] Highlighting selected state: ${selectedPath.id}`);
+                selectedPath.classList.add('selected-state');
+                selectedPath.style.fill = selectedColor;
+                // Move to end of parent to bring to front
+                if (selectedPath.parentNode) {
+                    selectedPath.parentNode.appendChild(selectedPath);
+                    console.log(`[updateMapColors] Moved ${selectedPath.id} to front`);
+                }
+            } else {
+                console.log('[updateMapColors] No selectedPath to highlight');
+            }
+        }
+
+        // Add CSS for selected state highlight
+        const style = document.createElement('style');
+        style.innerHTML = `
+            #usa-map path.selected-state {
+                stroke: #ff9800;
+                stroke-width: 4;
+                filter: drop-shadow(0 0 6px #ffd60088);
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // --- DYNAMICALLY LOAD USA MAP SVG ---
+        fetch('usa-states.svg')
+            .then(response => response.text())
+            .then(svgText => {
+                document.getElementById('usa-map-wrapper').innerHTML = svgText;
+
+                // Patch: Set path IDs to state codes if missing, and bring selected state to front
+                const stateCodeMap = {
+                    'Arizona': 'AZ',
+                    'California': 'CA',
+                    'Nevada': 'NV',
+                    'Oregon': 'OR',
+                    'Washington': 'WA'
+                    // Add more if your SVG includes more states
+                };
+                const svg = document.getElementById('usa-map-wrapper').querySelector('svg');
+                if (svg) {
+                    svg.id = 'usa-map'; // Ensure the SVG has the correct id for selection
+                    svg.querySelectorAll('path').forEach(path => {
+                        // Log all attributes for each path
+                        const attrs = Array.from(path.attributes).map(a => `${a.name}="${a.value}"`).join(' ');
+                        // Try to get the state name from <title> child if not in attribute
+                        let stateName = path.getAttribute('data-name') || path.getAttribute('title');
+                        if (!stateName) {
+                            const titleElem = path.querySelector('title') || path.parentNode.querySelector('title');
+                            if (titleElem) {
+                                stateName = titleElem.textContent.trim();
+                            }
+                        }
+                        console.log('[SVG Patch] Path attributes:', attrs);
+                        console.log('[SVG Patch] Found stateName:', stateName);
+                        if (stateName && stateCodeMap[stateName]) {
+                            path.id = stateCodeMap[stateName];
+                            console.log(`[SVG Patch] Set id for ${stateName} to ${stateCodeMap[stateName]}`);
+                        }
+                    });
+                    // Log all path ids after patching
+                    const ids = Array.from(svg.querySelectorAll('path')).map(p => p.id);
+                    console.log('[SVG Patch] Path ids after patching:', ids);
+                }
+
+                // Now that the SVG is loaded and patched, perform the initial visualization
+                visualizeResults();
+
+                // --- Bring selected state to front on every update ---
+                stateSelect.addEventListener('change', () => {
+                    const selectedState = stateSelect.value;
+                    if (selectedState !== 'ALL') {
+                        const selectedPath = document.querySelector(`#usa-map path[id='${selectedState}']`);
+                        if (selectedPath && selectedPath.parentNode) {
+                            selectedPath.parentNode.appendChild(selectedPath); // Move to end of parent, brings to front
+                        }
+                    }
+                });
+            });
+    </script>
+</body>
+</html>
